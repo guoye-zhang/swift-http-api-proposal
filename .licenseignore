@@ -1,0 +1,15 @@
+.gitignore
+.gitmodules
+.licenseignore
+.swiftformatignore
+.unacceptablelanguageignore
+.spi.yml
+.swift-format
+.github/
+Makefile
+**.md
+**.txt
+**Package.swift
+docker/*
+.editorconfig
+Scripts/*
