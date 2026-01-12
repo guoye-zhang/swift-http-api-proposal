@@ -16,22 +16,26 @@
 import HTTPAPIs
 import BasicContainers
 import Foundation
-
-// TODO: Can we get rid of this actor
-@globalActor actor RequestBodyActor: GlobalActor {
-    static let shared = RequestBodyActor()
-}
+import Synchronization
 
 @available(macOS 26.2, iOS 26.2, watchOS 26.2, tvOS 26.2, visionOS 26.2, *)
-@RequestBodyActor
-final class URLSessionRequestStreamBridge: NSObject, StreamDelegate, @unchecked Sendable {
-    let inputStream: InputStream
-    private let outputStream: OutputStream
-    private var spaceContinuation: CheckedContinuation<Void, Never>?
-    private var outputStreamOpened: Bool = false
-    var writeFailed: Bool = false
+final class URLSessionRequestStreamBridge: NSObject, StreamDelegate, Sendable {
+    private weak let task: URLSessionTask?
 
-    override init() {
+    private struct LockedState {
+        let inputStream: InputStream
+        let outputStream: OutputStream
+        var spaceContinuation: CheckedContinuation<Void, any Error>?
+        var outputStreamOpened: Bool = false
+        var writeFailed: Bool = false
+    }
+
+    private let lockedState: Mutex<LockedState>
+
+    private static let streamQueue: DispatchQueue = .init(label: "HTTPClientRequestBody")
+
+    init(task: URLSessionTask) {
+        self.task = task
         var inputStream: InputStream? = nil
         var outputStream: OutputStream? = nil
         unsafe Stream.getBoundStreams(
@@ -39,62 +43,88 @@ final class URLSessionRequestStreamBridge: NSObject, StreamDelegate, @unchecked 
             inputStream: &inputStream,
             outputStream: &outputStream
         )
-        self.inputStream = inputStream!
-        self.outputStream = outputStream!
+        self.lockedState = .init(.init(inputStream: inputStream!, outputStream: outputStream!))
 
         super.init()
     }
 
+    var inputStream: InputStream {
+        self.lockedState.withLock(\.inputStream)
+    }
+
+    var writeFailed: Bool {
+        self.lockedState.withLock(\.writeFailed)
+    }
+
     func write(_ span: Span<UInt8>) async throws {
-        if !self.outputStreamOpened {
-            self.outputStreamOpened = true
-            unsafe self.outputStream.delegate = self
-            CFWriteStreamSetDispatchQueue(
-                self.outputStream as CFWriteStream,
-                DispatchQueue(label: "HTTPClientRequestBody")
-            )
-            self.outputStream.open()
+        self.lockedState.withLock { state in
+            if !state.outputStreamOpened {
+                state.outputStreamOpened = true
+                unsafe state.outputStream.delegate = self
+                CFWriteStreamSetDispatchQueue(
+                    state.outputStream as CFWriteStream,
+                    Self.streamQueue
+                )
+                state.outputStream.open()
+            }
         }
         var remaining = span
         while !remaining.isEmpty {
             try Task.checkCancellation()
-            await self.waitForSpace()
-            let written = unsafe remaining.withUnsafeBufferPointer { buffer in
-                unsafe self.outputStream.write(buffer.baseAddress!, maxLength: buffer.count)
-            }
-            if written < 0 {
-                self.writeFailed = true
-                throw self.outputStream.streamError ?? CancellationError()
+            try await self.waitForSpace()
+            let written = try self.lockedState.withLock { state in
+                let written = unsafe remaining.withUnsafeBufferPointer { buffer in
+                    unsafe state.outputStream.write(buffer.baseAddress!, maxLength: buffer.count)
+                }
+                if written < 0 {
+                    state.writeFailed = true
+                    throw state.outputStream.streamError ?? CancellationError()
+                }
+                return written
             }
             remaining = remaining.extracting(droppingFirst: written)
         }
     }
 
-    private func waitForSpace() async {
-        if self.outputStream.hasSpaceAvailable {
-            return
-        }
-        while !self.outputStream.hasSpaceAvailable {
-            // TODO: This is not handling cancellation appropriately
-            await withCheckedContinuation { continuation in
-                self.spaceContinuation = continuation
+    private func waitForSpace() async throws {
+        while !self.lockedState.withLock({ $0.outputStream.hasSpaceAvailable }) {
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    self.lockedState.withLock {
+                        $0.spaceContinuation = continuation
+                    }
+                }
+            } onCancel: {
+                self.task?.cancel()
+                let continuation = self.lockedState.withLock { state in
+                    defer { state.spaceContinuation = nil }
+                    return state.spaceContinuation
+                }
+                continuation?.resume(throwing: CancellationError())
             }
         }
     }
 
     func close() {
-        self.outputStream.close()
+        self.lockedState.withLock { state in
+            state.outputStream.close()
+        }
     }
 
     func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
         if eventCode.contains(.hasSpaceAvailable) {
-            // TODO: Can we get rid of this task and instead use one task group
-            // for the entire client
-            Task.immediate {
-                let continuation = self.spaceContinuation
-                self.spaceContinuation = nil
-                continuation?.resume()
+            let continuation = self.lockedState.withLock { state in
+                defer { state.spaceContinuation = nil }
+                return state.spaceContinuation
             }
+            continuation?.resume()
+        }
+        if eventCode.contains(.errorOccurred) || eventCode.contains(.endEncountered) {
+            let continuation = self.lockedState.withLock { state in
+                defer { state.spaceContinuation = nil }
+                return state.spaceContinuation
+            }
+            continuation?.resume(throwing: aStream.streamError ?? CancellationError())
         }
     }
 }
@@ -111,7 +141,7 @@ extension URLSessionRequestStreamBridge: ConcludingAsyncWriter {
         } catch {
             result = .failure(error)
         }
-        await self.close()
+        self.close()
         return try result.get()
     }
 }
