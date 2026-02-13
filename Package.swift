@@ -44,6 +44,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.30.0"),
         .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-configuration", from: "1.0.0"),
+        .package(path: "../async-http-client"),
     ],
     targets: [
         // MARK: Libraries
@@ -64,6 +65,7 @@ let package = Package(
                 "NetworkTypes",
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "HTTPTypesFoundation", package: "swift-http-types"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client")
             ],
             swiftSettings: extraSettings
         ),
