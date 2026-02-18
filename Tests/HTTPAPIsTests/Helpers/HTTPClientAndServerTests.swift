@@ -136,7 +136,7 @@ final class TestClientAndServer: HTTPClient, HTTPServer, Sendable {
     func perform<Return: ~Copyable>(
         request: HTTPRequest,
         body: consuming HTTPClientRequestBody<AsyncChannelConcludingAsyncWriter.Underlying>?,
-        options: RequestOptions?,
+        options: RequestOptions,
         responseHandler: (HTTPResponse, consuming AsyncChannelConcludingAsyncReader) async throws -> Return
     ) async throws -> Return {
         let response = try await withCheckedThrowingContinuation { continuation in

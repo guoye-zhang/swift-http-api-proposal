@@ -236,13 +236,12 @@ final class URLSessionHTTPClient: HTTPClient, IdleTimerEntryProvider, Sendable {
     func perform<Return: ~Copyable>(
         request: HTTPRequest,
         body: consuming HTTPClientRequestBody<RequestWriter>?,
-        options: HTTPRequestOptions?,
+        options: HTTPRequestOptions,
         responseHandler: (HTTPResponse, consuming ResponseConcludingReader) async throws -> Return
     ) async throws -> Return {
         guard request.schemeSupported else {
             throw HTTPTypeConversionError.unsupportedScheme
         }
-        let options = options ?? .init()
         let request = try self.request(for: request, options: options)
         let session = self.session(for: options)
         let task: URLSessionTask

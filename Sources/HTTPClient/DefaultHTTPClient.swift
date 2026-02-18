@@ -145,7 +145,7 @@ public struct DefaultHTTPClient: HTTPClient, Sendable, ~Copyable {
     public func perform<Return: ~Copyable>(
         request: HTTPRequest,
         body: consuming HTTPClientRequestBody<RequestWriter>?,
-        options: HTTPRequestOptions?,
+        options: HTTPRequestOptions,
         responseHandler: (HTTPResponse, consuming ResponseConcludingReader) async throws -> Return
     ) async throws -> Return {
         #if canImport(Darwin)

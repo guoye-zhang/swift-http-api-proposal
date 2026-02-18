@@ -57,7 +57,7 @@ public protocol HTTPClient<RequestOptions>: ~Copyable {
     func perform<Return: ~Copyable>(
         request: HTTPRequest,
         body: consuming HTTPClientRequestBody<RequestWriter>?,
-        options: RequestOptions?,
+        options: RequestOptions,
         responseHandler: (HTTPResponse, consuming ResponseConcludingReader) async throws -> Return
     ) async throws -> Return
 }
