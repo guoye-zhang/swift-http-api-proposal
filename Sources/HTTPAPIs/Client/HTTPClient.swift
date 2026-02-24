@@ -57,4 +57,6 @@ public protocol HTTPClient<RequestOptions>: Sendable, ~Copyable {
         options: RequestOptions,
         responseHandler: (HTTPResponse, consuming ResponseConcludingReader) async throws -> Return
     ) async throws -> Return
+
+    var supportedFeatures: Set<HTTPClientCapability.Feature> { get }
 }

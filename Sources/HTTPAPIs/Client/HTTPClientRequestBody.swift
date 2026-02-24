@@ -68,6 +68,9 @@ where Writer.WriteElement == UInt8, Writer: SendableMetatype {
     /// the `Content-Length` header field.
     public let knownLength: Int64?
 
+    public var requiresStreaming: HTTPClientCapability.FeatureRequirement = .required
+    public var requiresBidirectionalStreaming: HTTPClientCapability.FeatureRequirement = .undeclared
+
     private enum WriteBody {
         case restartable(@Sendable (consuming Writer) async throws -> HTTPFields?)
         case seekable(@Sendable (Int64, consuming Writer) async throws -> HTTPFields?)

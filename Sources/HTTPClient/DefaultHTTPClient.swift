@@ -159,6 +159,14 @@ public struct DefaultHTTPClient: HTTPClient, ~Copyable {
         fatalError()
         #endif
     }
+
+    public var supportedFeatures: Set<HTTPClientCapability.Feature> {
+        #if canImport(Darwin)
+        self.client.supportedFeatures
+        #else
+        fatalError()
+        #endif
+    }
 }
 
 #endif

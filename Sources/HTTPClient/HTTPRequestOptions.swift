@@ -19,6 +19,10 @@ public import NetworkTypes
 public struct HTTPRequestOptions: HTTPClientCapability.RedirectionHandler, HTTPClientCapability.TLSVersionSelection,
     HTTPClientCapability.DeclarativePathSelection
 {
+    public var requiredFeatures: Set<HTTPAPIs.HTTPClientCapability.Feature> = []
+    public var agnosticFeatures: Set<HTTPAPIs.HTTPClientCapability.Feature> = []
+    public var evaluationMode: Bool = false
+
     public var redirectionHandler: (any HTTPClientRedirectionHandler)? = nil
 
     #if canImport(Darwin)

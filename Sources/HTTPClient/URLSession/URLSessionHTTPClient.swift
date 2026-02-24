@@ -253,6 +253,7 @@ final class URLSessionHTTPClient: HTTPClient, IdleTimerEntryProvider {
         options: HTTPRequestOptions,
         responseHandler: (HTTPResponse, consuming ResponseConcludingReader) async throws -> Return
     ) async throws -> Return {
+        self.validateConformance(request: request, body: body, options: options)
         guard request.schemeSupported else {
             throw HTTPTypeConversionError.unsupportedScheme
         }
@@ -262,10 +263,10 @@ final class URLSessionHTTPClient: HTTPClient, IdleTimerEntryProvider {
         let delegateBridge: URLSessionTaskDelegateBridge
         if let body {
             task = session.startTask().uploadTask(withStreamedRequest: request)
-            delegateBridge = URLSessionTaskDelegateBridge(task: task, body: body)
+            delegateBridge = URLSessionTaskDelegateBridge(task: task, body: body, options: options)
         } else {
             task = session.startTask().dataTask(with: request)
-            delegateBridge = URLSessionTaskDelegateBridge(task: task, body: nil)
+            delegateBridge = URLSessionTaskDelegateBridge(task: task, body: nil, options: options)
         }
         task.delegate = delegateBridge
         task.resume()
@@ -289,6 +290,13 @@ final class URLSessionHTTPClient: HTTPClient, IdleTimerEntryProvider {
             task.cancel()
         }
         return try result!.get()
+    }
+
+    var supportedFeatures: Set<HTTPClientCapability.Feature> {
+        [
+            .requestBodyStreaming,
+            .automaticCookieHandling,
+        ]
     }
 }
 #endif

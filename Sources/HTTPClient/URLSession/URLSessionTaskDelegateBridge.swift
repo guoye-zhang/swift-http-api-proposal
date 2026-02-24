@@ -41,15 +41,17 @@ final class URLSessionTaskDelegateBridge: NSObject, Sendable, URLSessionDataDele
     private let stream: AsyncStream<Callback>
     private let continuation: AsyncStream<Callback>.Continuation
     private let requestBody: HTTPClientRequestBody<URLSessionRequestStreamBridge>?
+    private let reportAutomaticCookieHandling: Bool
     // TODO: Can we get rid of this task and instead use on task group per client?
     private let requestBodyTask: Mutex<Task<Void, Never>?> = .init(nil)
 
-    init(task: URLSessionTask, body: consuming HTTPClientRequestBody<URLSessionRequestStreamBridge>?) {
+    init(task: URLSessionTask, body: consuming HTTPClientRequestBody<URLSessionRequestStreamBridge>?, options: HTTPRequestOptions) {
         self.task = task
         var continuation: AsyncStream<Callback>.Continuation?
         self.stream = AsyncStream { continuation = $0 }
         self.continuation = continuation!
         self.requestBody = body
+        self.reportAutomaticCookieHandling = options.evaluationMode && options.requiresAutomaticCookieHandling == .undeclared
     }
 
     // MARK: - Data path
@@ -138,6 +140,20 @@ final class URLSessionTaskDelegateBridge: NSObject, Sendable, URLSessionDataDele
             dataTask.cancel()
         case .awaitingConsumption:
             break
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        if self.reportAutomaticCookieHandling {
+            if task.originalRequest?.value(forHTTPHeaderField: "Cookie") == nil {
+                for transaction in metrics.transactionMetrics {
+                    if transaction.request.value(forHTTPHeaderField: "Cookie") != nil
+                        || (transaction.response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Set-Cookie") != nil
+                    {
+                        DefaultHTTPClient.reportUndeclaredFeatureUsage(feature: .automaticCookieHandling)
+                    }
+                }
+            }
         }
     }
 
