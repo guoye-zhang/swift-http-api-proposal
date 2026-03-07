@@ -12,14 +12,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if canImport(Darwin)
 @_exported public import HTTPAPIs
+
+#if canImport(Darwin)
 import Foundation
 import HTTPTypesFoundation
 import NetworkTypes
 import Synchronization
 
-/// The HTTPClient implementation backed by URLSession
+/// The HTTPClient implementation backed by URLSession.
 @available(macOS 26.2, iOS 26.2, watchOS 26.2, tvOS 26.2, visionOS 26.2, *)
 public final class URLSessionHTTPClient: HTTPClient, IdleTimerEntryProvider {
     public struct RequestWriter: AsyncWriter, ~Copyable {
