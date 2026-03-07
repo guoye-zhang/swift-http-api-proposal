@@ -35,7 +35,6 @@ We're exploring several interconnected pieces:
 - **NetworkTypes** - Basic cross-platform network configuration types.
 - **HTTPAPIs** - Protocol definitions for HTTP clients and servers.
 - **HTTPClient** - A default platform HTTP client.
-- **HTTPServer** - A default platform HTTP server.
 - **Middleware** - A composable middleware system for processing requests
 
 The general idea is that `AsyncStreaming` provides the foundation for streaming
@@ -87,8 +86,6 @@ try await HTTP.perform(
 Starting a simple echo HTTP server:
 
 ```swift
-import HTTPServer
-
 try await httpServer.serve { request, requestContext, requestBodyAndTrailers, responseSender in
     print("Received request \(request) with context \(requestContext)")
     
