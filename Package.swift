@@ -29,6 +29,7 @@ let package = Package(
         .library(name: "AHCHTTPClient", targets: ["AHCHTTPClient"]),
         .library(name: "NetworkTypes", targets: ["NetworkTypes"]),
         .library(name: "Middleware", targets: ["Middleware"]),
+        .library(name: "ServerMiddleware", targets: ["ServerMiddleware"]),
         .library(name: "HTTPClientConformance", targets: ["HTTPClientConformance"]),
     ],
     traits: [
@@ -43,6 +44,7 @@ let package = Package(
             traits: ["UnstableAsyncStreaming"]
         ),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-http-structured-headers.git", from: "1.7.0"),
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.19.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.13.2"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),
@@ -82,6 +84,14 @@ let package = Package(
         ),
         .target(
             name: "Middleware",
+            swiftSettings: extraSettings
+        ),
+        .target(
+            name: "ServerMiddleware",
+            dependencies: [
+                "HTTPAPIs",
+                .product(name: "AsyncStreaming", package: "swift-async-algorithms"),
+            ],
             swiftSettings: extraSettings
         ),
         .target(
@@ -179,6 +189,16 @@ let package = Package(
             ],
             swiftSettings: extraSettings
         ),
+        .testTarget(
+            name: "ExampleMiddlewareTests",
+            dependencies: [
+                "ExampleMiddleware",
+                "HTTPAPIs",
+                "ServerMiddleware",
+                .product(name: "BasicContainers", package: "swift-collections"),
+            ],
+            swiftSettings: extraSettings
+        ),
 
         // MARK: Examples
         .executableTarget(
@@ -225,9 +245,13 @@ let package = Package(
             dependencies: [
                 "HTTPAPIs",
                 "Middleware",
+                "ServerMiddleware",
+                .product(name: "BasicContainers", package: "swift-collections"),
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "StructuredFieldValues", package: "swift-http-structured-headers"),
             ],
             path: "Examples/ExampleMiddleware",
+            exclude: ["ResumableUpload/README.md"],
             swiftSettings: extraSettings
         ),
     ]
